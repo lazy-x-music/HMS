@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, lazy, Suspense } from 'react';
-import { Loader2, Flame } from 'lucide-react';
+import { Loader2, Flame, ShieldAlert, ArrowLeft } from 'lucide-react';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { supabase, type Inspection } from '@/lib/supabase';
 import AuthScreen from '@/screens/AuthScreen';
@@ -113,7 +113,7 @@ function AppInner() {
           onViewInspection={viewInspection}
           inspections={inspections}
           loading={dataLoading}
-          isAdmin={profile.role === 'admin'}
+          isAdmin={true}
           onDeleted={loadData}
         />
       </Suspense>
@@ -133,16 +133,6 @@ function AppInner() {
   }
 
   if (view.name === 'admin') {
-    if (profile.role !== 'admin') {
-      return (
-        <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-3 p-5 text-center">
-          <p className="text-slate-400 text-sm">Du har ikke tilgang til admin-panelet.</p>
-          <button onClick={() => setView({ name: 'dashboard' })} className="px-4 py-2 rounded-xl bg-slate-900 text-white text-sm font-medium">
-            Tilbake til hjem
-          </button>
-        </div>
-      );
-    }
     return (
       <Suspense fallback={Fallback}>
         <AdminLayout onBack={() => setView({ name: 'dashboard' })}>
@@ -155,18 +145,29 @@ function AppInner() {
   }
 
   return (
-    <Dashboard
-      onNavigate={navigate}
-      onStartInspection={() => setView({ name: 'form' })}
-      onStartTestInspection={() => setView({ name: 'form', testMode: true })}
-      testMode={testMode}
-      onToggleTestMode={() => setTestMode((v) => !v)}
-      onViewInspection={viewInspection}
-      inspections={inspections}
-      issuesCount={issuesCount}
-      loading={dataLoading}
-      onOpenAdmin={() => setView({ name: 'admin' })}
-    />
+    <div className="relative min-h-screen">
+      <Dashboard
+        onNavigate={navigate}
+        onStartInspection={() => setView({ name: 'form' })}
+        onStartTestInspection={() => setView({ name: 'form', testMode: true })}
+        testMode={testMode}
+        onToggleTestMode={() => setTestMode((v) => !v)}
+        onViewInspection={viewInspection}
+        inspections={inspections}
+        issuesCount={issuesCount}
+        loading={dataLoading}
+        onOpenAdmin={() => setView({ name: 'admin' })}
+      />
+
+      {/* Tydelig direkteknapp til Admin-panelet under testing */}
+      <button
+        onClick={() => setView({ name: 'admin' })}
+        className="fixed bottom-20 right-4 z-50 flex items-center gap-2 bg-slate-900 text-white px-4 py-2.5 rounded-full shadow-2xl border border-slate-700 text-xs font-semibold hover:bg-slate-800 transition-all active:scale-95"
+      >
+        <ShieldAlert className="w-4 h-4 text-orange-400" />
+        Åpne Admin
+      </button>
+    </div>
   );
 }
 
