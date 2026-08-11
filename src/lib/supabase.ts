@@ -20,6 +20,8 @@ export type Profile = {
   created_at: string;
 };
 
+// ============ Fire inspection (existing) ============
+
 export type InspectionStatus = 'pending' | 'completed';
 
 export type Inspection = {
@@ -93,6 +95,111 @@ export type Issue = {
   resolved_at: string | null;
 };
 
+// ============ Truck check ============
+
+export type TruckStatus = 'operational' | 'out_of_service';
+
+export type Truck = {
+  id: string;
+  name: string;
+  code: string;
+  status: TruckStatus;
+  sort_order: number;
+  active: boolean;
+  created_at: string;
+};
+
+export type TruckCheckStatus = 'pending' | 'completed';
+
+export type TruckCheckItemStatus = 'ok' | 'minor' | 'red_flag' | 'na';
+
+export type TruckCheck = {
+  id: string;
+  truck_id: string | null;
+  truck_name: string;
+  inspector_name: string;
+  status: TruckCheckStatus;
+  has_red_flag: boolean;
+  signature: string;
+  completed_at: string | null;
+  created_at: string;
+};
+
+export type TruckCheckItem = {
+  id: string;
+  truck_check_id: string;
+  item_key: string;
+  item_label: string;
+  status: TruckCheckItemStatus;
+  comment: string;
+  created_at: string;
+};
+
+// ============ Clothing logs ============
+
+export type ClothingLog = {
+  id: string;
+  employee_name: string;
+  item_type: string;
+  size: string;
+  action: 'issued' | 'returned' | 'replaced';
+  quantity: number;
+  comment: string;
+  created_at: string;
+};
+
+// ============ Closing routines ============
+
+export type ClosingRoutine = {
+  id: string;
+  inspector_name: string;
+  status: 'pending' | 'completed';
+  signature: string;
+  completed_at: string | null;
+  created_at: string;
+};
+
+export type ClosingRoutineItem = {
+  id: string;
+  closing_routine_id: string;
+  item_key: string;
+  item_label: string;
+  status: TruckCheckItemStatus;
+  comment: string;
+  created_at: string;
+};
+
+// ============ RUH reports ============
+
+export type RuhReport = {
+  id: string;
+  reporter_name: string;
+  category: 'near_miss' | 'hazard' | 'incident' | 'unsafe_act';
+  severity: 'low' | 'medium' | 'high';
+  location: string;
+  description: string;
+  action_taken: string;
+  status: 'open' | 'resolved';
+  photo_url: string;
+  resolved_at: string | null;
+  created_at: string;
+};
+
+// ============ HMS documents ============
+
+export type HmsDocument = {
+  id: string;
+  title: string;
+  category: 'procedure' | 'policy' | 'manual' | 'form';
+  description: string;
+  file_url: string;
+  sort_order: number;
+  active: boolean;
+  created_at: string;
+};
+
+// ============ Checklist helpers ============
+
 export const DEFAULT_CHECKLIST_ITEMS: { key: string; label: string }[] = [
   { key: '1.19', label: 'Blokkerte eller låste rømningsveier' },
   { key: '1.20', label: 'Tilgang til slokkeutstyr' },
@@ -106,6 +213,23 @@ export const DEFAULT_CHECKLIST_ITEMS: { key: string; label: string }[] = [
   { key: '1.28', label: 'Blinkende lysrør' },
   { key: '1.29', label: 'Tidsbrytere på kaffetraktere/vannvarmere' },
   { key: '1.30', label: 'Unødig bruk av skjøteledninger' },
+];
+
+export const TRUCK_CHECK_ITEMS: { key: string; label: string }[] = [
+  { key: 'brakes', label: 'Bremser' },
+  { key: 'battery', label: 'Batteri / Lading' },
+  { key: 'tires', label: 'Dekk og hjul' },
+  { key: 'hydraulics', label: 'Hydraulikk' },
+  { key: 'safety', label: 'Sikkerhetsutstyr' },
+];
+
+export const CLOSING_ROUTINE_ITEMS: { key: string; label: string }[] = [
+  { key: 'lights_off', label: 'Alle lys slått av' },
+  { key: 'doors_locked', label: 'Alle dører låst' },
+  { key: 'appliances_off', label: 'Apparater slått av' },
+  { key: 'emergency_exits', label: 'Nødutganger frie' },
+  { key: 'waste_secured', label: 'Avfall sikret' },
+  { key: 'alarm_system', label: 'Alarm aktivert' },
 ];
 
 export async function fetchChecklistItems(): Promise<ChecklistItem[]> {
@@ -133,6 +257,14 @@ export async function fetchFireStations(activeOnly = true): Promise<FireStation[
   const { data, error } = await q;
   if (error) throw error;
   return (data || []) as FireStation[];
+}
+
+export async function fetchTrucks(activeOnly = true): Promise<Truck[]> {
+  let q = supabase.from('trucks').select('*').order('sort_order', { ascending: true });
+  if (activeOnly) q = q.eq('active', true);
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data || []) as Truck[];
 }
 
 export const STATUS_META: Record<
@@ -173,6 +305,40 @@ export const STATUS_META: Record<
   },
 };
 
+export const TRUCK_STATUS_META: Record<
+  TruckCheckItemStatus,
+  { label: string; color: string; bg: string; border: string; dot: string }
+> = {
+  ok: {
+    label: 'OK',
+    color: 'text-emerald-700',
+    bg: 'bg-emerald-50',
+    border: 'border-emerald-500',
+    dot: 'bg-emerald-500',
+  },
+  minor: {
+    label: 'Mindre avvik',
+    color: 'text-amber-700',
+    bg: 'bg-amber-50',
+    border: 'border-amber-500',
+    dot: 'bg-amber-500',
+  },
+  red_flag: {
+    label: 'Rødt flagg',
+    color: 'text-red-700',
+    bg: 'bg-red-50',
+    border: 'border-red-500',
+    dot: 'bg-red-500',
+  },
+  na: {
+    label: 'Ikke relevant',
+    color: 'text-gray-600',
+    bg: 'bg-gray-100',
+    border: 'border-gray-400',
+    dot: 'bg-gray-400',
+  },
+};
+
 export const NORWEGIAN_MONTHS = [
   'Januar', 'Februar', 'Mars', 'April', 'Mai', 'Juni',
   'Juli', 'August', 'September', 'Oktober', 'November', 'Desember',
@@ -191,5 +357,15 @@ export function formatDateTime(iso: string | null): string {
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+  });
+}
+
+export function formatDate(iso: string | null): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('nb-NO', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
   });
 }
