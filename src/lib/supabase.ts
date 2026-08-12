@@ -117,7 +117,10 @@ export type TruckCheck = {
   id: string;
   truck_id: string | null;
   truck_name: string;
+  inspector_id: string | null;
   inspector_name: string;
+  inspector_email: string;
+  operating_hours: number | null;
   status: TruckCheckStatus;
   has_red_flag: boolean;
   signature: string;
@@ -216,11 +219,15 @@ export const DEFAULT_CHECKLIST_ITEMS: { key: string; label: string }[] = [
 ];
 
 export const TRUCK_CHECK_ITEMS: { key: string; label: string }[] = [
-  { key: 'brakes', label: 'Bremser' },
-  { key: 'battery', label: 'Batteri / Lading' },
-  { key: 'tires', label: 'Dekk og hjul' },
-  { key: 'hydraulics', label: 'Hydraulikk' },
-  { key: 'safety', label: 'Sikkerhetsutstyr' },
+  { key: 'visual_damage', label: 'Visuell kontroll & Skader' },
+  { key: 'wheels_tires', label: 'Hjul, Dekk & Hjulmuttere' },
+  { key: 'lifting_forks', label: 'Løfteutstyr & Gafler' },
+  { key: 'battery_fuel', label: 'Batteri / Drivstoff & Lading' },
+  { key: 'operator_safety', label: 'Førerplass & Sikkerhetsutstyr' },
+  { key: 'lights_signals', label: 'Lys, Signal & Fløyte' },
+  { key: 'steering_brakes', label: 'Styre- og Bremsesystem' },
+  { key: 'lifting_function', label: 'Løfte- og Senkefunksjon' },
+  { key: 'emergency_safety', label: 'Nødstopp & Sikkerhetsbrytere' },
 ];
 
 export const CLOSING_ROUTINE_ITEMS: { key: string; label: string }[] = [
@@ -265,6 +272,45 @@ export async function fetchTrucks(activeOnly = true): Promise<Truck[]> {
   const { data, error } = await q;
   if (error) throw error;
   return (data || []) as Truck[];
+}
+
+export async function fetchTruckChecks(): Promise<TruckCheck[]> {
+  const { data, error } = await supabase
+    .from('truck_checks')
+    .select('*')
+    .eq('status', 'completed')
+    .order('completed_at', { ascending: false });
+  if (error) throw error;
+  return (data || []) as TruckCheck[];
+}
+
+export async function fetchTruckCheckItems(checkId: string): Promise<TruckCheckItem[]> {
+  const { data, error } = await supabase
+    .from('truck_check_items')
+    .select('*')
+    .eq('truck_check_id', checkId);
+  if (error) throw error;
+  return (data || []) as TruckCheckItem[];
+}
+
+export type ComplianceEntry = {
+  truck: Truck;
+  checkedToday: boolean;
+  lastCheck: TruckCheck | null;
+};
+
+export async function fetchDailyCompliance(): Promise<ComplianceEntry[]> {
+  const [trucks, checks] = await Promise.all([fetchTrucks(false), fetchTruckChecks()]);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return trucks.map((truck) => {
+    const truckChecks = checks.filter((c) => c.truck_id === truck.id);
+    const lastCheck = truckChecks[0] || null;
+    const checkedToday = truckChecks.some(
+      (c) => c.completed_at && new Date(c.completed_at) >= today,
+    );
+    return { truck, checkedToday, lastCheck };
+  });
 }
 
 export const STATUS_META: Record<

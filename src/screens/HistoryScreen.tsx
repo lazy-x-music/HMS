@@ -13,9 +13,10 @@ type Props = {
   loading: boolean;
   isAdmin?: boolean;
   onDeleted?: () => void;
+  onOpenTruckLog?: () => void;
 };
 
-export default function HistoryScreen({ onBack, onNavigate, onViewInspection, inspections, loading, isAdmin, onDeleted }: Props) {
+export default function HistoryScreen({ onBack, onNavigate, onViewInspection, inspections, loading, isAdmin, onDeleted, onOpenTruckLog }: Props) {
   const [query, setQuery] = useState('');
   const [yearFilter, setYearFilter] = useState<string>('all');
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -74,6 +75,12 @@ export default function HistoryScreen({ onBack, onNavigate, onViewInspection, in
             <p className="text-slate-400 text-xs">Alle fullførte inspeksjoner</p>
           </div>
         </div>
+
+        {isAdmin && onOpenTruckLog && (
+          <button onClick={onOpenTruckLog} className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-cyan-500 transition-colors">
+            <History className="w-4 h-4" /> Åpne Truck Logg / Historikk
+          </button>
+        )}
 
         {/* Search */}
         <div className="flex items-center gap-3 bg-white/10 rounded-xl px-3.5 py-2.5">

@@ -1,20 +1,22 @@
 import { useState } from 'react';
-import { ArrowLeft, Users, Building2, ClipboardList, ShieldCheck, Truck } from 'lucide-react';
+import { ArrowLeft, Users, Building2, ClipboardList, ShieldCheck, Truck, History } from 'lucide-react';
 
-export type AdminTab = 'users' | 'stations' | 'checklist' | 'trucks';
+export type AdminTab = 'users' | 'stations' | 'checklist' | 'trucks' | 'truck-log';
 
 type Props = {
   onBack: () => void;
   children: (tab: AdminTab) => React.ReactNode;
+  initialTab?: AdminTab;
 };
 
-export default function AdminLayout({ onBack, children }: Props) {
-  const [tab, setTab] = useState<AdminTab>('users');
+export default function AdminLayout({ onBack, children, initialTab = 'users' }: Props) {
+  const [tab, setTab] = useState<AdminTab>(initialTab);
 
   const tabs: { id: AdminTab; label: string; icon: React.ReactNode }[] = [
     { id: 'users', label: 'Brukere', icon: <Users className="w-4 h-4" /> },
     { id: 'stations', label: 'Brannposter', icon: <Building2 className="w-4 h-4" /> },
     { id: 'trucks', label: 'Trucker', icon: <Truck className="w-4 h-4" /> },
+    { id: 'truck-log', label: 'Truck logg', icon: <History className="w-4 h-4" /> },
     { id: 'checklist', label: 'Sjekkliste', icon: <ClipboardList className="w-4 h-4" /> },
   ];
 

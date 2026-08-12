@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, lazy, Suspense } from 'react';
+import type { AdminTab } from '@/screens/admin/AdminLayout';
 import { Loader2, ShieldCheck } from 'lucide-react';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { supabase, type Inspection } from '@/lib/supabase';
@@ -20,6 +21,7 @@ const UserManagement = lazy(() => import('@/screens/admin/UserManagement'));
 const StationManagement = lazy(() => import('@/screens/admin/StationManagement'));
 const ChecklistManagement = lazy(() => import('@/screens/admin/ChecklistManagement'));
 const TruckManagement = lazy(() => import('@/screens/admin/TruckManagement'));
+const TruckAuditLog = lazy(() => import('@/screens/admin/TruckAuditLog')); 
 
 type Tab = 'dashboard' | 'history' | 'issues';
 type View =
@@ -34,7 +36,7 @@ type View =
   | { name: 'ruh' }
   | { name: 'handbook' }
   | { name: 'inspection-detail'; id: string }
-  | { name: 'admin' };
+  | { name: 'admin'; initialTab?: AdminTab };
 
 function AppInner() {
   const { session, profile, loading } = useAuth();
@@ -89,9 +91,9 @@ function AppInner() {
   if (view.name === 'ruh') return <RuhReport onBack={() => setView({ name: 'hub' })} />;
   if (view.name === 'handbook') return <Handbook onBack={() => setView({ name: 'hub' })} />;
   if (view.name === 'inspection-detail') return <Suspense fallback={fallback}><InspectionDetail inspectionId={view.id} onBack={() => setView({ name: 'hub' })} /></Suspense>;
-  if (view.name === 'history') return <Suspense fallback={fallback}><HistoryScreen onBack={() => setView({ name: 'hub' })} onNavigate={navigate} onViewInspection={(id) => setView({ name: 'inspection-detail', id })} inspections={inspections} loading={dataLoading} isAdmin={profile.role === 'admin'} onDeleted={loadData} /></Suspense>;
+  if (view.name === 'history') return <Suspense fallback={fallback}><HistoryScreen onBack={() => setView({ name: 'hub' })} onNavigate={navigate} onViewInspection={(id) => setView({ name: 'inspection-detail', id })} inspections={inspections} loading={dataLoading} isAdmin={profile.role === 'admin'} onDeleted={loadData} onOpenTruckLog={() => setView({ name: 'admin', initialTab: 'truck-log' })} /></Suspense>;
   if (view.name === 'issues') return <Suspense fallback={fallback}><IssuesScreen onBack={() => setView({ name: 'hub' })} onNavigate={navigate} onViewInspection={(id) => setView({ name: 'inspection-detail', id })} /></Suspense>;
-  if (view.name === 'admin') return profile.role === 'admin' ? <Suspense fallback={fallback}><AdminLayout onBack={() => setView({ name: 'hub' })}>{(tab) => tab === 'users' ? <UserManagement /> : tab === 'stations' ? <StationManagement /> : tab === 'trucks' ? <TruckManagement /> : <ChecklistManagement />}</AdminLayout></Suspense> : <div className="flex min-h-screen items-center justify-center bg-[#f5f7fa] p-5 text-center"><div><p className="text-sm text-slate-500">Du har ikke tilgang til admin-panelet.</p><button onClick={() => setView({ name: 'hub' })} className="mt-4 rounded-xl bg-slate-950 px-4 py-2 text-sm font-bold text-white">Tilbake til Hub</button></div></div>;
+  if (view.name === 'admin') return profile.role === 'admin' ? <Suspense fallback={fallback}><AdminLayout initialTab={view.initialTab} onBack={() => setView({ name: 'hub' })}>{(tab) => tab === 'users' ? <UserManagement /> : tab === 'stations' ? <StationManagement /> : tab === 'trucks' ? <TruckManagement /> : tab === 'truck-log' ? <TruckAuditLog onOpenCheck={(id) => setView({ name: 'truck-detail', id })} /> : <ChecklistManagement />}</AdminLayout></Suspense> : <div className="flex min-h-screen items-center justify-center bg-[#f5f7fa] p-5 text-center"><div><p className="text-sm text-slate-500">Du har ikke tilgang til admin-panelet.</p><button onClick={() => setView({ name: 'hub' })} className="mt-4 rounded-xl bg-slate-950 px-4 py-2 text-sm font-bold text-white">Tilbake til Hub</button></div></div>;
   return null;
 }
 
