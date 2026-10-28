@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
 import {
   ArrowLeft, AlertTriangle, CheckCircle2, ChevronRight, Loader2,
-  Calendar, User, ImageOff,
+  Calendar, User, ImageOff, MapPin, TriangleAlert,
 } from 'lucide-react';
-import { supabase, formatMonthYear, formatDateTime, type Issue, type Inspection } from '@/lib/supabase';
+import { supabase, formatDateTime, type Issue, type Inspection, type RuhReport } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
-import { BottomNav } from './Dashboard';
 
 type Tab = 'dashboard' | 'history' | 'issues';
 
@@ -15,10 +14,15 @@ type Props = {
   onViewInspection: (id: string) => void;
 };
 
+type CombinedIssue =
+  | { kind: 'issue'; data: Issue }
+  | { kind: 'ruh'; data: RuhReport };
+
 export default function IssuesScreen({ onBack, onNavigate, onViewInspection }: Props) {
   const { profile } = useAuth();
   const isAdmin = profile?.role === 'admin';
   const [issues, setIssues] = useState<Issue[]>([]);
+  const [ruhReports, setRuhReports] = useState<RuhReport[]>([]);
   const [inspMap, setInspMap] = useState<Record<string, Inspection>>({});
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'open' | 'resolved' | 'all'>('open');
@@ -27,11 +31,13 @@ export default function IssuesScreen({ onBack, onNavigate, onViewInspection }: P
 
   async function load() {
     setLoading(true);
-    const [{ data: iss }, { data: insps }] = await Promise.all([
+    const [{ data: iss }, { data: ruhs }, { data: insps }] = await Promise.all([
       supabase.from('issues').select('*').order('created_at', { ascending: false }),
+      supabase.from('ruh_reports').select('*').order('created_at', { ascending: false }),
       supabase.from('inspections').select('*'),
     ]);
     setIssues((iss || []) as Issue[]);
+    setRuhReports((ruhs || []) as RuhReport[]);
     const map: Record<string, Inspection> = {};
     for (const i of (insps || []) as Inspection[]) map[i.id] = i;
     setInspMap(map);
@@ -64,123 +70,220 @@ export default function IssuesScreen({ onBack, onNavigate, onViewInspection }: P
     setBusyId(null);
   }
 
-  const filtered = issues.filter((i) => filter === 'all' || i.status === filter);
-  const openCount = issues.filter((i) => i.status === 'open').length;
-  const resolvedCount = issues.filter((i) => i.status === 'resolved').length;
+  async function resolveRuh(report: RuhReport) {
+    setBusyId(report.id);
+    const { error } = await supabase
+      .from('ruh_reports')
+      .update({ status: 'resolved', resolved_at: new Date().toISOString() })
+      .eq('id', report.id);
+    if (!error) {
+      setRuhReports((prev) => prev.map((r) => (r.id === report.id ? { ...r, status: 'resolved', resolved_at: new Date().toISOString() } : r)));
+    }
+    setBusyId(null);
+  }
+
+  async function reopenRuh(report: RuhReport) {
+    setBusyId(report.id);
+    const { error } = await supabase
+      .from('ruh_reports')
+      .update({ status: 'open', resolved_at: null })
+      .eq('id', report.id);
+    if (!error) {
+      setRuhReports((prev) => prev.map((r) => (r.id === report.id ? { ...r, status: 'open', resolved_at: null } : r)));
+    }
+    setBusyId(null);
+  }
+
+  const ruhCategoryLabel: Record<string, string> = {
+    near_miss: 'Nestenulykke',
+    hazard: 'Farlig forhold',
+    incident: 'Hendelse',
+    unsafe_act: 'Usikker handling',
+  };
+  const ruhSeverityTone: Record<string, string> = {
+    low: 'bg-neutral-100 text-neutral-600',
+    medium: 'bg-warning-100 text-warning-700',
+    high: 'bg-error-100 text-error-700',
+  };
+
+  const combined: CombinedIssue[] = [
+    ...issues.map((i) => ({ kind: 'issue' as const, data: i })),
+    ...ruhReports.map((r) => ({ kind: 'ruh' as const, data: r })),
+  ].sort((a, b) => new Date(b.data.created_at).getTime() - new Date(a.data.created_at).getTime());
+
+  const filtered = combined.filter((item) => {
+    const status = item.data.status;
+    return filter === 'all' || status === filter;
+  });
+
+  const openCount = combined.filter((i) => i.data.status === 'open').length;
+  const resolvedCount = combined.filter((i) => i.data.status === 'resolved').length;
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-24">
-      <header className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-5 pt-12 pb-6 sticky top-0 z-40">
-        <div className="flex items-center gap-3 mb-4">
-          <button
-            onClick={onBack}
-            className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div className="flex-1">
-            <h1 className="text-white font-bold text-lg">Avvik</h1>
-            <p className="text-slate-400 text-xs">Åpne og løste avvik</p>
-          </div>
-        </div>
-
-        {/* Filter tabs */}
-        <div className="flex gap-1 p-1 bg-white/10 rounded-xl">
-          {([
-            { id: 'open', label: `Åpne (${openCount})` },
-            { id: 'resolved', label: `Løste (${resolvedCount})` },
-            { id: 'all', label: 'Alle' },
-          ] as const).map((f) => (
+    <div className="min-h-screen bg-neutral-50 pb-24">
+      <header className="bg-neutral-900 px-5 pt-7 pb-6 text-white sm:px-8">
+        <div className="mx-auto max-w-3xl">
+          <div className="mb-4 flex items-center gap-3">
             <button
-              key={f.id}
-              onClick={() => setFilter(f.id)}
-              className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all ${
-                filter === f.id ? 'bg-white text-slate-900' : 'text-slate-300'
-              }`}
+              onClick={onBack}
+              className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 transition hover:bg-white/15"
             >
-              {f.label}
+              <ArrowLeft className="h-5 w-5" />
             </button>
-          ))}
+            <div className="flex-1">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-warning-300">Hendelse & sikkerhet</p>
+              <h1 className="text-xl font-bold">Avvik</h1>
+            </div>
+          </div>
+
+          <div className="flex gap-1 rounded-xl bg-white/10 p-1">
+            {([
+              { id: 'open', label: `Åpne (${openCount})` },
+              { id: 'resolved', label: `Løste (${resolvedCount})` },
+              { id: 'all', label: 'Alle' },
+            ] as const).map((f) => (
+              <button
+                key={f.id}
+                onClick={() => setFilter(f.id)}
+                className={`flex-1 rounded-lg py-2 text-xs font-semibold transition-all ${
+                  filter === f.id ? 'bg-white text-neutral-900' : 'text-neutral-300'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
         </div>
       </header>
 
-      <div className="px-5 mt-4">
+      <div className="mx-auto max-w-3xl px-5 py-5 sm:px-8">
         {loading ? (
           <div className="flex justify-center py-16">
-            <Loader2 className="w-6 h-6 text-slate-400 animate-spin" />
+            <Loader2 className="h-6 w-6 animate-spin text-neutral-400" />
           </div>
         ) : filtered.length === 0 ? (
-          <div className="bg-white rounded-2xl p-10 text-center">
-            <CheckCircle2 className="w-12 h-12 text-emerald-300 mx-auto mb-3" />
-            <p className="text-slate-400 text-sm">Ingen avvik å vise</p>
+          <div className="rounded-2xl border border-dashed border-neutral-300 bg-white p-10 text-center">
+            <CheckCircle2 className="mx-auto mb-3 h-12 w-12 text-success-300" />
+            <p className="text-sm text-neutral-400">Ingen avvik å vise</p>
           </div>
         ) : (
-          <div className="space-y-2.5">
-            {filtered.map((issue) => {
-              const insp = inspMap[issue.inspection_id];
-              const isOpen = issue.status === 'open';
+          <div className="space-y-3">
+            {filtered.map((item) => {
+              if (item.kind === 'issue') {
+                const issue = item.data;
+                const insp = inspMap[issue.inspection_id];
+                const isOpen = issue.status === 'open';
+                return (
+                  <div
+                    key={issue.id}
+                    className={`rounded-2xl border border-neutral-200 border-l-4 bg-white p-4 shadow-card ${
+                      isOpen ? 'border-l-error-500' : 'border-l-success-500'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${isOpen ? 'bg-error-50' : 'bg-success-50'}`}>
+                        <AlertTriangle className={`h-5 w-5 ${isOpen ? 'text-error-500' : 'text-success-500'}`} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-neutral-400">{issue.item_key}</span>
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${isOpen ? 'bg-error-100 text-error-700' : 'bg-success-100 text-success-700'}`}>
+                            {isOpen ? 'ÅPEN' : 'LØST'}
+                          </span>
+                          <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-semibold text-neutral-500">
+                            Brannvern
+                          </span>
+                        </div>
+                        <p className="mt-0.5 text-sm font-semibold leading-snug text-neutral-900">{issue.item_label}</p>
+                        {issue.comment && <p className="mt-1.5 text-xs leading-relaxed text-neutral-500">{issue.comment}</p>}
+                        {issue.photo_url && (
+                          <button onClick={() => setPhotoModal(issue.photo_url)} className="mt-2 inline-block">
+                            <img src={issue.photo_url} alt="Bevis" className="h-20 w-20 rounded-xl object-cover" />
+                          </button>
+                        )}
+                        {insp && (
+                          <div className="mt-2.5 space-y-1 text-xs text-neutral-400">
+                            <div className="flex items-center gap-1.5">
+                              <Calendar className="h-3 w-3" />
+                              {insp.inspector_name}
+                            </div>
+                          </div>
+                        )}
+                        {insp && (
+                          <button
+                            onClick={() => onViewInspection(insp.id)}
+                            className="mt-2 flex items-center gap-1 text-xs font-medium text-error-600"
+                          >
+                            Se inspeksjon <ChevronRight className="h-3 w-3" />
+                          </button>
+                        )}
+                        {isAdmin && (
+                          <button
+                            onClick={() => (isOpen ? resolve(issue) : reopen(issue))}
+                            disabled={busyId === issue.id}
+                            className={`mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-semibold transition disabled:opacity-60 ${
+                              isOpen ? 'bg-success-50 text-success-700 hover:bg-success-100' : 'bg-warning-50 text-warning-700 hover:bg-warning-100'
+                            }`}
+                          >
+                            {busyId === issue.id && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                            {isOpen ? 'Merk som løst' : 'Gjenåpne avvik'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              const report = item.data;
+              const isOpen = report.status === 'open';
               return (
                 <div
-                  key={issue.id}
-                  className={`bg-white rounded-2xl shadow-sm p-4 border-l-4 ${
-                    isOpen ? 'border-red-500' : 'border-emerald-500'
+                  key={report.id}
+                  className={`rounded-2xl border border-neutral-200 border-l-4 bg-white p-4 shadow-card ${
+                    isOpen ? 'border-l-warning-500' : 'border-l-success-500'
                   }`}
                 >
                   <div className="flex items-start gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                      isOpen ? 'bg-red-50' : 'bg-emerald-50'
-                    }`}>
-                      <AlertTriangle className={`w-5 h-5 ${isOpen ? 'text-red-500' : 'text-emerald-500'}`} />
+                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${isOpen ? 'bg-warning-50' : 'bg-success-50'}`}>
+                      <TriangleAlert className={`h-5 w-5 ${isOpen ? 'text-warning-500' : 'text-success-500'}`} />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-slate-400">{issue.item_key}</span>
-                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                          isOpen ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'
-                        }`}>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${isOpen ? 'bg-error-100 text-error-700' : 'bg-success-100 text-success-700'}`}>
                           {isOpen ? 'ÅPEN' : 'LØST'}
                         </span>
+                        <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-semibold text-neutral-500">
+                          RUH
+                        </span>
+                        <span className="text-xs font-bold text-neutral-600">{ruhCategoryLabel[report.category] || report.category}</span>
+                        {report.severity && (
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${ruhSeverityTone[report.severity] || 'bg-neutral-100 text-neutral-600'}`}>
+                            {report.severity === 'low' ? 'Lav' : report.severity === 'medium' ? 'Middels' : 'Høy'}
+                          </span>
+                        )}
                       </div>
-                      <p className="text-slate-900 font-semibold text-sm mt-0.5 leading-snug">{issue.item_label}</p>
-                      {issue.comment && (
-                        <p className="text-slate-500 text-xs mt-1.5 leading-relaxed">{issue.comment}</p>
+                      <p className="mt-1.5 text-sm leading-relaxed text-neutral-600">{report.description}</p>
+                      {report.location && (
+                        <p className="mt-1.5 flex items-center gap-1 text-xs text-neutral-400">
+                          <MapPin className="h-3 w-3" /> {report.location}
+                        </p>
                       )}
-                      {issue.photo_url && (
-                        <button onClick={() => setPhotoModal(issue.photo_url)} className="mt-2 inline-block">
-                          <img src={issue.photo_url} alt="Bevis" className="w-20 h-20 rounded-xl object-cover" />
-                        </button>
-                      )}
-                      {insp && (
-                        <div className="mt-2.5 space-y-1 text-xs text-slate-400">
-                          <div className="flex items-center gap-1.5">
-                            <Calendar className="w-3 h-3" />
-                            {formatMonthYear(insp.period_month, insp.period_year)}
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <User className="w-3 h-3" />
-                            {insp.inspector_name}
-                          </div>
+                      {report.reporter_name && (
+                        <div className="mt-2 flex items-center gap-1.5 text-xs text-neutral-400">
+                          <User className="h-3 w-3" /> {report.reporter_name}
+                          <span>· {formatDateTime(report.created_at)}</span>
                         </div>
-                      )}
-                      {insp && (
-                        <button
-                          onClick={() => onViewInspection(insp.id)}
-                          className="mt-2 text-xs text-red-600 font-medium flex items-center gap-1"
-                        >
-                          Se inspeksjon <ChevronRight className="w-3 h-3" />
-                        </button>
                       )}
                       {isAdmin && (
                         <button
-                          onClick={() => (isOpen ? resolve(issue) : reopen(issue))}
-                          disabled={busyId === issue.id}
-                          className={`mt-3 w-full py-2.5 rounded-xl text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 ${
-                            isOpen
-                              ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                              : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
-                          } disabled:opacity-60`}
+                          onClick={() => (isOpen ? resolveRuh(report) : reopenRuh(report))}
+                          disabled={busyId === report.id}
+                          className={`mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-semibold transition disabled:opacity-60 ${
+                            isOpen ? 'bg-success-50 text-success-700 hover:bg-success-100' : 'bg-warning-50 text-warning-700 hover:bg-warning-100'
+                          }`}
                         >
-                          {busyId === issue.id && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                          {busyId === report.id && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                           {isOpen ? 'Merk som løst' : 'Gjenåpne avvik'}
                         </button>
                       )}
@@ -193,14 +296,30 @@ export default function IssuesScreen({ onBack, onNavigate, onViewInspection }: P
         )}
       </div>
 
-      <BottomNav active="issues" onNavigate={onNavigate} />
+      {/* Mobile bottom nav */}
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-neutral-200 bg-white/95 px-5 py-3 backdrop-blur sm:hidden">
+        <div className="mx-auto flex max-w-md items-center justify-around">
+          <button onClick={onBack} className="flex flex-col items-center gap-1 text-neutral-400">
+            <Calendar className="h-5 w-5" />
+            <span className="text-[10px] font-semibold">Hub</span>
+          </button>
+          <button className="flex flex-col items-center gap-1 text-primary-600">
+            <AlertTriangle className="h-5 w-5" />
+            <span className="text-[10px] font-semibold">Avvik</span>
+          </button>
+          <button onClick={() => onNavigate('history')} className="flex flex-col items-center gap-1 text-neutral-400">
+            <Calendar className="h-5 w-5" />
+            <span className="text-[10px] font-semibold">Historikk</span>
+          </button>
+        </div>
+      </nav>
 
       {photoModal && (
         <div
-          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-5"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-5"
           onClick={() => setPhotoModal(null)}
         >
-          <img src={photoModal} alt="Bevis" className="max-w-full max-h-full rounded-2xl" />
+          <img src={photoModal} alt="Bevis" className="max-h-full max-w-full rounded-2xl" />
         </div>
       )}
     </div>

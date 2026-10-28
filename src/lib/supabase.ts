@@ -103,6 +103,11 @@ export type Truck = {
   id: string;
   name: string;
   code: string;
+  brand: string;
+  model: string;
+  serial_no: string;
+  truck_class: string;
+  truck_type: string;
   status: TruckStatus;
   sort_order: number;
   active: boolean;
@@ -138,6 +143,75 @@ export type TruckCheckItem = {
   created_at: string;
 };
 
+// ============ Truck training (Typeopplæring § 10-4) ============
+
+export type TruckTraining = {
+  id: string;
+  truck_id: string | null;
+  truck_name: string;
+  truck_brand: string;
+  truck_model: string;
+  truck_serial_no: string;
+  truck_class: string;
+  truck_type: string;
+  employee_id: string | null;
+  employee_name: string;
+  instructor_id: string | null;
+  instructor_name: string;
+  instructor_email: string;
+  completed_date: string | null;
+  employee_signature: string;
+  instructor_signature: string;
+  status: string;
+  certificate_url: string;
+  approved: boolean;
+  approved_by: string | null;
+  approved_at: string | null;
+  created_at: string;
+};
+
+export type TruckTrainingItem = {
+  id: string;
+  truck_training_id: string;
+  item_key: string;
+  item_label: string;
+  checked: boolean;
+  note: string;
+  created_at: string;
+};
+
+export const TRUCK_TRAINING_ITEMS: { key: string; label: string }[] = [
+  { key: 'license_class', label: 'Truckførerbevis klasse' },
+  { key: 'instruction_book', label: 'Instruksjonsbok' },
+  { key: 'daily_inspection', label: 'Daglig kontroll, dokumentasjon og krav' },
+  { key: 'truck_description', label: 'Beskrivelse og visning av trucken' },
+  { key: 'user_training_controls', label: 'Brukeropplæring: Spaker, Bremser/Brytere/Pedaler, Tilleggsutstyr' },
+  { key: 'capacity_plate', label: 'Maskinskilt, forståelse og løftekapasitet' },
+  { key: 'mast_height', label: 'Mast / kjørehøyde (nedsenket, maks høyde, friløft)' },
+  { key: 'charging_maintenance', label: 'Lading og vedlikehold av batteri / væsker' },
+  { key: 'parking_safety', label: 'Parkering, sted og sikkerhet' },
+  { key: 'local_extras', label: 'Lokalt tillegg / Tilleggsutstyr' },
+];
+
+export async function fetchTruckTrainings(): Promise<TruckTraining[]> {
+  const { data, error } = await supabase
+    .from('truck_trainings')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []) as TruckTraining[];
+}
+
+export async function fetchTruckTrainingsForEmployee(employeeId: string): Promise<TruckTraining[]> {
+  const { data, error } = await supabase
+    .from('truck_trainings')
+    .select('*')
+    .eq('employee_id', employeeId)
+    .order('completed_date', { ascending: false });
+  if (error) throw error;
+  return (data || []) as TruckTraining[];
+}
+
 // ============ Clothing logs ============
 
 export type ClothingLog = {
@@ -156,6 +230,8 @@ export type ClothingLog = {
 export type ClosingRoutine = {
   id: string;
   inspector_name: string;
+  inspector_id: string | null;
+  template_id: string | null;
   status: 'pending' | 'completed';
   signature: string;
   completed_at: string | null;
@@ -165,10 +241,31 @@ export type ClosingRoutine = {
 export type ClosingRoutineItem = {
   id: string;
   closing_routine_id: string;
+  template_item_id: string | null;
   item_key: string;
   item_label: string;
   status: TruckCheckItemStatus;
   comment: string;
+  created_at: string;
+};
+
+export type ClosingRoutineTemplate = {
+  id: string;
+  name: string;
+  scope: string;
+  description: string;
+  active: boolean;
+  sort_order: number;
+  created_by: string | null;
+  created_at: string;
+};
+
+export type ClosingRoutineTemplateItem = {
+  id: string;
+  template_id: string;
+  item_key: string;
+  item_label: string;
+  sort_order: number;
   created_at: string;
 };
 
@@ -193,9 +290,13 @@ export type RuhReport = {
 export type HmsDocument = {
   id: string;
   title: string;
-  category: 'procedure' | 'policy' | 'manual' | 'form';
+  category: 'procedure' | 'policy' | 'manual' | 'form' | 'guideline' | 'instruction' | 'report';
   description: string;
   file_url: string;
+  file_name: string;
+  file_size: number | null;
+  mime_type: string;
+  created_by: string | null;
   sort_order: number;
   active: boolean;
   created_at: string;

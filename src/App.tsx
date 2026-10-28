@@ -7,6 +7,8 @@ import AuthScreen from '@/screens/AuthScreen';
 import Hub, { type ModuleId } from '@/screens/Hub';
 import TruckCheck from '@/screens/TruckCheck';
 import TruckCheckDetail from '@/screens/TruckCheckDetail';
+import TruckTraining from '@/screens/TruckTraining';
+import TruckTrainingComplete from '@/screens/TruckTrainingComplete';
 import ClothingLog from '@/screens/ClothingLog';
 import ClosingRoutine from '@/screens/ClosingRoutine';
 import RuhReport from '@/screens/RuhReport';
@@ -21,7 +23,10 @@ const UserManagement = lazy(() => import('@/screens/admin/UserManagement'));
 const StationManagement = lazy(() => import('@/screens/admin/StationManagement'));
 const ChecklistManagement = lazy(() => import('@/screens/admin/ChecklistManagement'));
 const TruckManagement = lazy(() => import('@/screens/admin/TruckManagement'));
-const TruckAuditLog = lazy(() => import('@/screens/admin/TruckAuditLog')); 
+const TruckAuditLog = lazy(() => import('@/screens/admin/TruckAuditLog'));
+const TrainingManagement = lazy(() => import('@/screens/admin/TrainingManagement'));
+const ClosingRoutineManagement = lazy(() => import('@/screens/admin/ClosingRoutineManagement'));
+const DocumentLibrary = lazy(() => import('@/screens/admin/DocumentLibrary'));
 
 type Tab = 'dashboard' | 'history' | 'issues';
 type View =
@@ -31,6 +36,8 @@ type View =
   | { name: 'fire'; testMode?: boolean }
   | { name: 'truck' }
   | { name: 'truck-detail'; id: string }
+  | { name: 'training' }
+  | { name: 'training-complete'; id: string }
   | { name: 'clothing' }
   | { name: 'closing' }
   | { name: 'ruh' }
@@ -64,10 +71,10 @@ function AppInner() {
 
   useEffect(() => { if (session) loadData(); }, [session, loadData]);
 
-  if (loading) return <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-slate-950"><div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-red-500 to-orange-500"><ShieldCheck className="h-9 w-9 text-white" /></div><Loader2 className="h-6 w-6 animate-spin text-slate-500" /></div>;
+  if (loading) return <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-neutral-900"><div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-primary-500 to-primary-700"><ShieldCheck className="h-9 w-9 text-white" /></div><Loader2 className="h-6 w-6 animate-spin text-neutral-500" /></div>;
   if (!session || !profile) return <AuthScreen />;
 
-  const fallback = <div className="flex min-h-screen items-center justify-center bg-[#f5f7fa]"><Loader2 className="h-6 w-6 animate-spin text-slate-400" /></div>;
+  const fallback = <div className="flex min-h-screen items-center justify-center bg-neutral-50"><Loader2 className="h-6 w-6 animate-spin text-neutral-400" /></div>;
   const navigate = (tab: Tab) => {
     if (tab === 'dashboard') setView({ name: 'hub' });
     else if (tab === 'history') setView({ name: 'history' });
@@ -76,16 +83,33 @@ function AppInner() {
   const openModule = (module: ModuleId) => {
     if (module === 'fire') setView({ name: 'fire' });
     else if (module === 'truck') setView({ name: 'truck' });
+    else if (module === 'training') setView({ name: 'training' });
     else if (module === 'clothing') setView({ name: 'clothing' });
     else if (module === 'closing') setView({ name: 'closing' });
     else if (module === 'ruh') setView({ name: 'ruh' });
     else setView({ name: 'handbook' });
   };
 
+  const renderAdminTab = (tab: AdminTab) => {
+    switch (tab) {
+      case 'users': return <UserManagement />;
+      case 'stations': return <StationManagement />;
+      case 'trucks': return <TruckManagement />;
+      case 'truck-log': return <TruckAuditLog onOpenCheck={(id) => setView({ name: 'truck-detail', id })} />;
+      case 'training': return <TrainingManagement />;
+      case 'closing': return <ClosingRoutineManagement />;
+      case 'documents': return <DocumentLibrary />;
+      case 'checklist': return <ChecklistManagement />;
+      default: return <UserManagement />;
+    }
+  };
+
   if (view.name === 'hub') return <Hub onNavigate={navigate} onOpenModule={openModule} onOpenAdmin={() => setView({ name: 'admin' })} issuesCount={issuesCount} completedToday={completedToday} />;
   if (view.name === 'fire') return <Suspense fallback={fallback}><InspectionForm onBack={() => setView({ name: 'hub' })} onComplete={(id) => { loadData(); setView({ name: 'inspection-detail', id }); }} existing={view.testMode ? null : inspections.find((item) => item.period_month === new Date().getMonth() + 1 && item.period_year === new Date().getFullYear())} testMode={!!view.testMode} /></Suspense>;
   if (view.name === 'truck') return <TruckCheck onBack={() => setView({ name: 'hub' })} onComplete={(id) => { loadData(); setView({ name: 'truck-detail', id }); }} />;
   if (view.name === 'truck-detail') return <TruckCheckDetail id={view.id} onBack={() => setView({ name: 'hub' })} />;
+  if (view.name === 'training') return <TruckTraining onBack={() => setView({ name: 'hub' })} onComplete={(id) => setView({ name: 'training-complete', id })} />;
+  if (view.name === 'training-complete') return <TruckTrainingComplete id={view.id} onBack={() => setView({ name: 'hub' })} />;
   if (view.name === 'clothing') return <ClothingLog onBack={() => setView({ name: 'hub' })} />;
   if (view.name === 'closing') return <ClosingRoutine onBack={() => setView({ name: 'hub' })} onComplete={() => setView({ name: 'hub' })} />;
   if (view.name === 'ruh') return <RuhReport onBack={() => setView({ name: 'hub' })} />;
@@ -93,7 +117,7 @@ function AppInner() {
   if (view.name === 'inspection-detail') return <Suspense fallback={fallback}><InspectionDetail inspectionId={view.id} onBack={() => setView({ name: 'hub' })} /></Suspense>;
   if (view.name === 'history') return <Suspense fallback={fallback}><HistoryScreen onBack={() => setView({ name: 'hub' })} onNavigate={navigate} onViewInspection={(id) => setView({ name: 'inspection-detail', id })} inspections={inspections} loading={dataLoading} isAdmin={profile.role === 'admin'} onDeleted={loadData} onOpenTruckLog={() => setView({ name: 'admin', initialTab: 'truck-log' })} /></Suspense>;
   if (view.name === 'issues') return <Suspense fallback={fallback}><IssuesScreen onBack={() => setView({ name: 'hub' })} onNavigate={navigate} onViewInspection={(id) => setView({ name: 'inspection-detail', id })} /></Suspense>;
-  if (view.name === 'admin') return profile.role === 'admin' ? <Suspense fallback={fallback}><AdminLayout initialTab={view.initialTab} onBack={() => setView({ name: 'hub' })}>{(tab) => tab === 'users' ? <UserManagement /> : tab === 'stations' ? <StationManagement /> : tab === 'trucks' ? <TruckManagement /> : tab === 'truck-log' ? <TruckAuditLog onOpenCheck={(id) => setView({ name: 'truck-detail', id })} /> : <ChecklistManagement />}</AdminLayout></Suspense> : <div className="flex min-h-screen items-center justify-center bg-[#f5f7fa] p-5 text-center"><div><p className="text-sm text-slate-500">Du har ikke tilgang til admin-panelet.</p><button onClick={() => setView({ name: 'hub' })} className="mt-4 rounded-xl bg-slate-950 px-4 py-2 text-sm font-bold text-white">Tilbake til Hub</button></div></div>;
+  if (view.name === 'admin') return profile.role === 'admin' ? <Suspense fallback={fallback}><AdminLayout initialTab={view.initialTab} onBack={() => setView({ name: 'hub' })}>{renderAdminTab}</AdminLayout></Suspense> : <div className="flex min-h-screen items-center justify-center bg-neutral-50 p-5 text-center"><div><p className="text-sm text-neutral-500">Du har ikke tilgang til admin-panelet.</p><button onClick={() => setView({ name: 'hub' })} className="mt-4 rounded-xl bg-neutral-900 px-4 py-2 text-sm font-bold text-white">Tilbake til Hub</button></div></div>;
   return null;
 }
 

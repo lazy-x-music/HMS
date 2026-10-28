@@ -1,54 +1,290 @@
-import { useState } from 'react';
-import { ArrowLeft, Users, Building2, ClipboardList, ShieldCheck, Truck, History } from 'lucide-react';
+import { useState, useEffect, type ReactNode } from 'react';
+import {
+  ArrowLeft, Users, Building2, ClipboardList, Truck, History,
+  ShieldCheck, LayoutDashboard, GraduationCap, Moon, FileText,
+  Loader2, AlertCircle, CircleAlert, CheckCircle2, Settings,
+} from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/lib/supabase';
 
-export type AdminTab = 'users' | 'stations' | 'checklist' | 'trucks' | 'truck-log';
+export type AdminTab =
+  | 'dashboard'
+  | 'users'
+  | 'stations'
+  | 'checklist'
+  | 'trucks'
+  | 'truck-log'
+  | 'training'
+  | 'closing'
+  | 'documents';
 
 type Props = {
   onBack: () => void;
-  children: (tab: AdminTab) => React.ReactNode;
+  children: (tab: AdminTab) => ReactNode;
   initialTab?: AdminTab;
 };
 
-export default function AdminLayout({ onBack, children, initialTab = 'users' }: Props) {
-  const [tab, setTab] = useState<AdminTab>(initialTab);
+type Overview = {
+  userCount: number;
+  truckCount: number;
+  openIssues: number;
+  truckChecksToday: number;
+  pendingTrainings: number;
+  approvedTrainings: number;
+  documents: number;
+  closingRoutinesToday: number;
+  ruhOpen: number;
+};
 
-  const tabs: { id: AdminTab; label: string; icon: React.ReactNode }[] = [
-    { id: 'users', label: 'Brukere', icon: <Users className="w-4 h-4" /> },
-    { id: 'stations', label: 'Brannposter', icon: <Building2 className="w-4 h-4" /> },
-    { id: 'trucks', label: 'Trucker', icon: <Truck className="w-4 h-4" /> },
-    { id: 'truck-log', label: 'Truck logg', icon: <History className="w-4 h-4" /> },
-    { id: 'checklist', label: 'Sjekkliste', icon: <ClipboardList className="w-4 h-4" /> },
+export default function AdminLayout({ onBack, children, initialTab = 'dashboard' }: Props) {
+  const { profile } = useAuth();
+  const [tab, setTab] = useState<AdminTab>(initialTab);
+  const [overview, setOverview] = useState<Overview | null>(null);
+  const [ovLoading, setOvLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadOverview() {
+      setOvLoading(true);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const [
+        usersR, trucksR, issuesR, truckChecksR, trainingsR,
+        docsR, closingR, ruhR,
+      ] = await Promise.all([
+        supabase.from('profiles').select('*', { count: 'exact', head: true }),
+        supabase.from('trucks').select('*', { count: 'exact', head: true }),
+        supabase.from('issues').select('*', { count: 'exact', head: true }).eq('status', 'open'),
+        supabase.from('truck_checks').select('completed_at', { count: 'exact', head: true }).eq('status', 'completed'),
+        supabase.from('truck_trainings').select('approved', { count: 'exact' }),
+        supabase.from('hms_documents').select('*', { count: 'exact', head: true }),
+        supabase.from('closing_routines').select('created_at', { count: 'exact', head: true }).eq('status', 'completed'),
+        supabase.from('ruh_reports').select('*', { count: 'exact', head: true }).eq('status', 'open'),
+      ]);
+
+      const trainings = (trainingsR.data || []) as { approved: boolean }[];
+      const truckChecksToday = (truckChecksR.data || []).filter(
+        (c: { completed_at: string | null }) => c.completed_at && new Date(c.completed_at) >= today
+      ).length;
+      const closingToday = (closingR.data || []).filter(
+        (c: { created_at: string | null }) => c.created_at && new Date(c.created_at) >= today
+      ).length;
+
+      setOverview({
+        userCount: usersR.count || 0,
+        truckCount: trucksR.count || 0,
+        openIssues: (issuesR.count || 0) + (ruhR.count || 0),
+        truckChecksToday,
+        pendingTrainings: trainings.filter((t) => !t.approved).length,
+        approvedTrainings: trainings.filter((t) => t.approved).length,
+        documents: docsR.count || 0,
+        closingRoutinesToday: closingToday,
+        ruhOpen: ruhR.count || 0,
+      });
+      setOvLoading(false);
+    }
+    loadOverview();
+  }, []);
+
+  const tabs: { id: AdminTab; label: string; icon: ReactNode }[] = [
+    { id: 'dashboard', label: 'Oversikt', icon: <LayoutDashboard className="h-4 w-4" /> },
+    { id: 'users', label: 'Brukere', icon: <Users className="h-4 w-4" /> },
+    { id: 'stations', label: 'Brannposter', icon: <Building2 className="h-4 w-4" /> },
+    { id: 'trucks', label: 'Trucker', icon: <Truck className="h-4 w-4" /> },
+    { id: 'truck-log', label: 'Truck logg', icon: <History className="h-4 w-4" /> },
+    { id: 'training', label: 'Typeopplæring', icon: <GraduationCap className="h-4 w-4" /> },
+    { id: 'closing', label: 'Stengerutiner', icon: <Moon className="h-4 w-4" /> },
+    { id: 'documents', label: 'Dokumenter', icon: <FileText className="h-4 w-4" /> },
+    { id: 'checklist', label: 'Sjekkliste', icon: <ClipboardList className="h-4 w-4" /> },
   ];
 
   return (
-    <div className="min-h-screen bg-[#f5f7fa]">
-      <header className="bg-slate-950 text-white">
-        <div className="mx-auto max-w-3xl px-5 pt-7 pb-5 sm:px-8 sm:pt-9">
-          <div className="flex items-center gap-3 mb-6">
-            <button onClick={onBack} className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-white hover:bg-white/15 transition-colors">
-              <ArrowLeft className="w-5 h-5" />
+    <div className="min-h-screen bg-neutral-50">
+      {/* Header */}
+      <header className="bg-neutral-900 text-white">
+        <div className="mx-auto max-w-6xl px-5 pt-7 pb-5 sm:px-8 sm:pt-9">
+          <div className="mb-6 flex items-center gap-3">
+            <button
+              onClick={onBack}
+              className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-white transition hover:bg-white/15"
+            >
+              <ArrowLeft className="h-5 w-5" />
             </button>
-            <div className="flex-1 flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-emerald-400" />
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-300">Administrasjon</p>
-                <h1 className="text-xl font-bold">Admin-panel</h1>
+            <div className="flex flex-1 items-center gap-2">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary-500 to-primary-700">
+                <ShieldCheck className="h-5 w-5" />
               </div>
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-300">
+                  Control Tower
+                </p>
+                <h1 className="text-xl font-bold">Administrasjon</h1>
+              </div>
+            </div>
+            <div className="hidden text-right sm:block">
+              <p className="text-sm font-semibold text-white">{profile?.full_name || 'Admin'}</p>
+              <p className="text-xs text-neutral-400">{profile?.email}</p>
             </div>
           </div>
 
-          <div className="flex gap-1 p-1 bg-white/10 rounded-2xl">
+          {/* Tabs */}
+          <div className="flex gap-1 overflow-x-auto rounded-2xl bg-white/10 p-1 no-scrollbar">
             {tabs.map((t) => (
-              <button key={t.id} onClick={() => setTab(t.id)} className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${tab === t.id ? 'bg-white text-slate-900' : 'text-slate-300 hover:bg-white/5'}`}>
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={`flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-2.5 text-xs font-semibold transition-all ${
+                  tab === t.id
+                    ? 'bg-white text-neutral-900 shadow-sm'
+                    : 'text-neutral-300 hover:bg-white/5'
+                }`}
+              >
                 {t.icon}
-                <span className="hidden sm:inline">{t.label}</span>
+                <span>{t.label}</span>
               </button>
             ))}
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-5 py-6 sm:px-8">{children(tab)}</main>
+      <main className="mx-auto max-w-6xl px-5 py-6 sm:px-8">
+        {tab === 'dashboard' ? (
+          <AdminDashboard overview={overview} loading={ovLoading} onNavigate={setTab} />
+        ) : (
+          children(tab)
+        )}
+      </main>
     </div>
+  );
+}
+
+function AdminDashboard({
+  overview,
+  loading,
+  onNavigate,
+}: {
+  overview: Overview | null;
+  loading: boolean;
+  onNavigate: (tab: AdminTab) => void;
+}) {
+  if (loading || !overview) {
+    return (
+      <div className="flex justify-center py-20">
+        <Loader2 className="h-6 w-6 animate-spin text-neutral-400" />
+      </div>
+    );
+  }
+
+  const stats: {
+    tab: AdminTab;
+    icon: ReactNode;
+    value: number | string;
+    label: string;
+    tone: string;
+  }[] = [
+    { tab: 'truck-log', icon: <Truck className="h-5 w-5" />, value: overview.truckChecksToday, label: 'Truckkontroller i dag', tone: 'blue' },
+    { tab: 'truck-log', icon: <CircleAlert className="h-5 w-5" />, value: overview.openIssues, label: 'Åpne avvik', tone: 'amber' },
+    { tab: 'training', icon: <GraduationCap className="h-5 w-5" />, value: overview.pendingTrainings, label: 'Venter godkjenning', tone: 'red' },
+    { tab: 'training', icon: <CheckCircle2 className="h-5 w-5" />, value: overview.approvedTrainings, label: 'Godkjente opplæringer', tone: 'green' },
+    { tab: 'closing', icon: <Moon className="h-5 w-5" />, value: overview.closingRoutinesToday, label: 'Stengerutiner i dag', tone: 'blue' },
+    { tab: 'documents', icon: <FileText className="h-5 w-5" />, value: overview.documents, label: 'HMS-dokumenter', tone: 'green' },
+    { tab: 'users', icon: <Users className="h-5 w-5" />, value: overview.userCount, label: 'Brukere', tone: 'neutral' },
+    { tab: 'trucks', icon: <Truck className="h-5 w-5" />, value: overview.truckCount, label: 'Trucker', tone: 'neutral' },
+  ];
+
+  const tones: Record<string, string> = {
+    blue: 'bg-primary-50 text-primary-700',
+    green: 'bg-success-50 text-success-700',
+    amber: 'bg-warning-50 text-warning-700',
+    red: 'bg-error-50 text-error-700',
+    neutral: 'bg-neutral-100 text-neutral-700',
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Hero banner */}
+      <div className="animate-fade-in rounded-2xl bg-neutral-900 p-6 text-white shadow-card sm:p-8">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary-300">Ledelsesoversikt</p>
+            <h2 className="mt-1 text-2xl font-bold sm:text-3xl">Sikkerhetsettersynelse</h2>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-neutral-400">
+              Følg etterlevelse, godkjente opplæringer, åpne avvik og stengerutiner i sanntid.
+            </p>
+          </div>
+          <Settings className="hidden h-10 w-10 text-primary-300 sm:block" />
+        </div>
+      </div>
+
+      {/* Stats grid */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {stats.map((stat, idx) => (
+          <button
+            key={idx}
+            onClick={() => onNavigate(stat.tab)}
+            className="group rounded-2xl border border-neutral-200 bg-white p-4 text-left shadow-card transition hover:-translate-y-0.5 hover:shadow-card-hover"
+          >
+            <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${tones[stat.tone]}`}>
+              {stat.icon}
+            </div>
+            <p className="mt-3 text-2xl font-bold text-neutral-900">{stat.value}</p>
+            <p className="text-xs text-neutral-400">{stat.label}</p>
+          </button>
+        ))}
+      </div>
+
+      {/* Quick links */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <QuickLink
+          onClick={() => onNavigate('training')}
+          icon={<GraduationCap className="h-5 w-5" />}
+          title="Typeopplæring § 10-4"
+          desc="Godkjenn og administrer truckførerkompetanse"
+          tone="primary"
+        />
+        <QuickLink
+          onClick={() => onNavigate('closing')}
+          icon={<Moon className="h-5 w-5" />}
+          title="Stengerutiner"
+          desc="Opprett og overvåk stengerutine-maler"
+          tone="primary"
+        />
+        <QuickLink
+          onClick={() => onNavigate('documents')}
+          icon={<FileText className="h-5 w-5" />}
+          title="Dokumentbibliotek"
+          desc="Last opp og organiser HMS-dokumenter"
+          tone="primary"
+        />
+      </div>
+    </div>
+  );
+}
+
+function QuickLink({
+  onClick,
+  icon,
+  title,
+  desc,
+  tone = 'primary',
+}: {
+  onClick: () => void;
+  icon: ReactNode;
+  title: string;
+  desc: string;
+  tone?: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-4 rounded-2xl border border-neutral-200 bg-white p-5 text-left shadow-card transition hover:-translate-y-0.5 hover:shadow-card-hover"
+    >
+      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-50 text-primary-700">
+        {icon}
+      </div>
+      <div className="flex-1">
+        <p className="font-bold text-neutral-900">{title}</p>
+        <p className="mt-1 text-sm text-neutral-500">{desc}</p>
+      </div>
+    </button>
   );
 }
