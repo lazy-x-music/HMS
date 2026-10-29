@@ -24,6 +24,7 @@ const StationManagement = lazy(() => import('@/screens/admin/StationManagement')
 const ChecklistManagement = lazy(() => import('@/screens/admin/ChecklistManagement'));
 const TruckManagement = lazy(() => import('@/screens/admin/TruckManagement'));
 const TruckAuditLog = lazy(() => import('@/screens/admin/TruckAuditLog'));
+const FireRoundsManagement = lazy(() => import('@/screens/admin/FireRoundsManagement'));
 const TrainingManagement = lazy(() => import('@/screens/admin/TrainingManagement'));
 const ClosingRoutineManagement = lazy(() => import('@/screens/admin/ClosingRoutineManagement'));
 const DocumentLibrary = lazy(() => import('@/screens/admin/DocumentLibrary'));
@@ -96,6 +97,7 @@ function AppInner() {
       case 'stations': return <StationManagement />;
       case 'trucks': return <TruckManagement />;
       case 'truck-log': return <TruckAuditLog onOpenCheck={(id) => setView({ name: 'truck-detail', id })} />;
+      case 'fire-rounds': return <FireRoundsManagement />;
       case 'training': return <TrainingManagement />;
       case 'closing': return <ClosingRoutineManagement />;
       case 'documents': return <DocumentLibrary />;

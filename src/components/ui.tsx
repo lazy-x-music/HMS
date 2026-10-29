@@ -53,8 +53,8 @@ export function Badge({
 
 /* ---------- Button ---------- */
 const btnVariants: Record<string, string> = {
-  primary: 'bg-primary-600 text-white hover:bg-primary-700 shadow-sm',
-  accent: 'bg-accent-600 text-white hover:bg-accent-700 shadow-sm',
+  primary: 'bg-primary-600 text-white hover:bg-primary-700 shadow-glow-primary',
+  accent: 'bg-accent-600 text-white hover:bg-accent-700 shadow-glow-accent',
   success: 'bg-success-600 text-white hover:bg-success-700 shadow-sm',
   danger: 'bg-error-600 text-white hover:bg-error-700 shadow-sm',
   ghost: 'bg-transparent text-neutral-700 hover:bg-neutral-100',

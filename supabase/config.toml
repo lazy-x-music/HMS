@@ -1,0 +1,3 @@
+[functions.create-user]
+verify_jwt = true
+entrypoint = "./functions/create-user/index.ts"
