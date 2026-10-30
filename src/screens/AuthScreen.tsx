@@ -1,14 +1,10 @@
 import { useState } from 'react';
-import { ShieldCheck, Lock, Mail, User, AlertCircle, Loader2, Flame } from 'lucide-react';
+import { ShieldCheck, Lock, Mail, AlertCircle, Loader2, Flame } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
-type Mode = 'login' | 'signup';
-
 export default function AuthScreen() {
-  const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -21,36 +17,11 @@ export default function AuthScreen() {
     }
     setBusy(true);
     try {
-      if (mode === 'login') {
-        const { error: err } = await supabase.auth.signInWithPassword({ email, password });
-        if (err) throw err;
-      } else {
-        if (!fullName.trim()) {
-          setError('Fyll inn fullt navn.');
-          setBusy(false);
-          return;
-        }
-        const { data, error: err } = await supabase.auth.signUp({
-          email,
-          password,
-          options: { data: { full_name: fullName.trim() } },
-        });
-        if (err) throw err;
-        if (data.user) {
-          await supabase
-            .from('profiles')
-            .upsert({ id: data.user.id, email, full_name: fullName.trim(), role: 'inspector' });
-        }
-      }
+      const { error: err } = await supabase.auth.signInWithPassword({ email, password });
+      if (err) throw err;
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Ukjent feil';
-      setError(
-        msg.includes('Invalid login')
-          ? 'Feil e-post eller passord.'
-          : msg.includes('already registered')
-          ? 'Denne e-posten er allerede registrert.'
-          : msg
-      );
+      setError(msg.includes('Invalid login') ? 'Feil e-post eller passord.' : msg);
     } finally {
       setBusy(false);
     }
@@ -86,42 +57,9 @@ export default function AuthScreen() {
 
         {/* Card */}
         <div className="animate-scale-in rounded-3xl border border-white/10 bg-white/[0.03] p-6 shadow-elevated backdrop-blur-xl">
-          {/* Mode toggle */}
-          <div className="mb-6 flex gap-1 rounded-2xl bg-neutral-900/60 p-1">
-            <button
-              onClick={() => { setMode('login'); setError(''); }}
-              className={`flex-1 rounded-xl py-2.5 text-sm font-semibold transition-all duration-200 ${
-                mode === 'login'
-                  ? 'bg-white text-neutral-900 shadow-sm'
-                  : 'text-neutral-400 hover:text-neutral-200'
-              }`}
-            >
-              Logg inn
-            </button>
-            <button
-              onClick={() => { setMode('signup'); setError(''); }}
-              className={`flex-1 rounded-xl py-2.5 text-sm font-semibold transition-all duration-200 ${
-                mode === 'signup'
-                  ? 'bg-white text-neutral-900 shadow-sm'
-                  : 'text-neutral-400 hover:text-neutral-200'
-              }`}
-            >
-              Ny konto
-            </button>
-          </div>
+          <h2 className="mb-6 font-display text-lg font-bold text-white">Logg inn</h2>
 
           <form onSubmit={submit} className="space-y-3.5">
-            {mode === 'signup' && (
-              <Field icon={<User className="h-5 w-5" />}>
-                <input
-                  type="text"
-                  placeholder="Fullt navn"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  className="w-full bg-transparent text-sm text-white outline-none placeholder:text-neutral-500"
-                />
-              </Field>
-            )}
             <Field icon={<Mail className="h-5 w-5" />}>
               <input
                 type="email"
@@ -154,7 +92,7 @@ export default function AuthScreen() {
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary-500 to-primary-700 py-3 text-sm font-bold text-white shadow-glow-primary transition-all duration-200 hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-60"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
-              {mode === 'login' ? 'Logg inn' : 'Opprett konto'}
+              Logg inn
             </button>
           </form>
         </div>
