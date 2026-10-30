@@ -1,14 +1,25 @@
-import { useState } from 'react';
-import { ShieldCheck, Lock, Mail, AlertCircle, Loader2, Flame } from 'lucide-react';
+import { useState, type FormEvent } from 'react';
+import { ShieldCheck, Lock, Mail, Loader2, Flame, ArrowLeft, MailCheck } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { AuthShell, AuthField, AuthError } from '@/components/AuthShell';
+
+type Mode = 'login' | 'forgot';
 
 export default function AuthScreen() {
+  const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
 
-  async function submit(e: React.FormEvent) {
+  function switchMode(next: Mode) {
+    setMode(next);
+    setError('');
+    setSent(false);
+  }
+
+  async function signIn(e: FormEvent) {
     e.preventDefault();
     setError('');
     if (!email || !password) {
@@ -16,110 +27,141 @@ export default function AuthScreen() {
       return;
     }
     setBusy(true);
-    try {
-      const { error: err } = await supabase.auth.signInWithPassword({ email, password });
-      if (err) throw err;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Ukjent feil';
-      setError(msg.includes('Invalid login') ? 'Feil e-post eller passord.' : msg);
-    } finally {
-      setBusy(false);
+    const { error: err } = await supabase.auth.signInWithPassword({ email, password });
+    setBusy(false);
+    if (err) {
+      setError(err.message.includes('Invalid login') ? 'Feil e-post eller passord.' : err.message);
     }
   }
 
-  return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-neutral-950 p-5">
-      {/* Ambient background */}
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-primary-600/20 blur-[120px]" />
-        <div className="absolute -bottom-40 -right-32 h-96 w-96 rounded-full bg-accent-600/15 blur-[120px]" />
-        <div className="absolute left-1/2 top-1/3 h-64 w-64 -translate-x-1/2 rounded-full bg-primary-500/10 blur-[100px]" />
-      </div>
+  async function sendResetLink(e: FormEvent) {
+    e.preventDefault();
+    setError('');
+    if (!email.trim()) {
+      setError('Skriv inn e-postadressen din.');
+      return;
+    }
+    setBusy(true);
+    const { error: err } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: window.location.origin,
+    });
+    setBusy(false);
+    if (err) {
+      setError(err.message);
+      return;
+    }
+    setSent(true);
+  }
 
-      {/* Subtle grid pattern */}
-      <div
-        className="pointer-events-none absolute inset-0 opacity-[0.03]"
-        style={{
-          backgroundImage: 'linear-gradient(rgb(255 255 255 / 0.5) 1px, transparent 1px), linear-gradient(90deg, rgb(255 255 255 / 0.5) 1px, transparent 1px)',
-          backgroundSize: '48px 48px',
-        }}
-      />
+  const footer = (
+    <div className="flex flex-wrap items-center justify-center gap-2">
+      {[
+        { icon: Flame, label: 'Brannvern' },
+        { icon: ShieldCheck, label: 'Trucksjekk' },
+        { icon: Lock, label: 'Arbeidstøy' },
+      ].map((pill) => (
+        <span key={pill.label} className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-medium text-neutral-400">
+          <pill.icon className="h-3 w-3" />
+          {pill.label}
+        </span>
+      ))}
+    </div>
+  );
 
-      <div className="relative w-full max-w-sm">
-        {/* Logo + brand */}
-        <div className="mb-8 flex flex-col items-center text-center">
-          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-500 via-primary-600 to-primary-800 shadow-glow-primary">
-            <ShieldCheck className="h-9 w-9 text-white" strokeWidth={2.2} />
+  if (mode === 'forgot') {
+    return (
+      <AuthShell title="Glemt passord" footer={footer}>
+        {sent ? (
+          <div className="space-y-5 text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-success-500/15 text-success-300">
+              <MailCheck className="h-6 w-6" />
+            </div>
+            <p className="text-sm leading-6 text-neutral-300">
+              Hvis e-postadressen finnes hos oss, har vi sendt en lenke for å velge nytt passord.
+            </p>
+            <button onClick={() => switchMode('login')} className="text-sm font-semibold text-primary-300 transition hover:text-primary-200">
+              Tilbake til innlogging
+            </button>
           </div>
-          <h1 className="font-display text-2xl font-extrabold tracking-tight text-white">Aksell HMS</h1>
-          <p className="mt-1.5 text-sm text-neutral-400">Sikkerhetsportal for brannvern og HMS</p>
-        </div>
-
-        {/* Card */}
-        <div className="animate-scale-in rounded-3xl border border-white/10 bg-white/[0.03] p-6 shadow-elevated backdrop-blur-xl">
-          <h2 className="mb-6 font-display text-lg font-bold text-white">Logg inn</h2>
-
-          <form onSubmit={submit} className="space-y-3.5">
-            <Field icon={<Mail className="h-5 w-5" />}>
+        ) : (
+          <form onSubmit={sendResetLink} className="space-y-3.5">
+            <p className="text-sm leading-6 text-neutral-400">
+              Skriv inn e-postadressen din, så sender vi deg en lenke for å velge nytt passord.
+            </p>
+            <AuthField icon={<Mail className="h-5 w-5" />}>
               <input
                 type="email"
+                autoComplete="email"
                 placeholder="E-post"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-transparent text-sm text-white outline-none placeholder:text-neutral-500"
               />
-            </Field>
-            <Field icon={<Lock className="h-5 w-5" />}>
-              <input
-                type="password"
-                placeholder="Passord"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-transparent text-sm text-white outline-none placeholder:text-neutral-500"
-              />
-            </Field>
-
-            {error && (
-              <div className="flex items-start gap-2 rounded-xl border border-error-500/30 bg-error-500/10 p-3 text-sm text-error-300">
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                <span>{error}</span>
-              </div>
-            )}
-
+            </AuthField>
+            {error && <AuthError message={error} />}
             <button
               type="submit"
               disabled={busy}
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary-500 to-primary-700 py-3 text-sm font-bold text-white shadow-glow-primary transition-all duration-200 hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-60"
             >
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
-              Logg inn
+              {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+              Send lenke
+            </button>
+            <button
+              type="button"
+              onClick={() => switchMode('login')}
+              className="flex w-full items-center justify-center gap-1.5 pt-1 text-sm text-neutral-400 transition hover:text-white"
+            >
+              <ArrowLeft className="h-4 w-4" /> Tilbake til innlogging
             </button>
           </form>
-        </div>
+        )}
+      </AuthShell>
+    );
+  }
 
-        {/* Feature pills */}
-        <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
-          {[
-            { icon: Flame, label: 'Brannvern' },
-            { icon: ShieldCheck, label: 'Trucksjekk' },
-            { icon: Lock, label: 'Arbeidstøy' },
-          ].map((pill) => (
-            <span key={pill.label} className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-medium text-neutral-400">
-              <pill.icon className="h-3 w-3" />
-              {pill.label}
-            </span>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Field({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-neutral-900/40 px-4 py-3 transition-colors focus-within:border-primary-400/60 focus-within:bg-neutral-900/60">
-      <span className="text-neutral-500">{icon}</span>
-      {children}
-    </div>
+    <AuthShell title="Logg inn" footer={footer}>
+      <form onSubmit={signIn} className="space-y-3.5">
+        <AuthField icon={<Mail className="h-5 w-5" />}>
+          <input
+            type="email"
+            autoComplete="email"
+            placeholder="E-post"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full bg-transparent text-sm text-white outline-none placeholder:text-neutral-500"
+          />
+        </AuthField>
+        <AuthField icon={<Lock className="h-5 w-5" />}>
+          <input
+            type="password"
+            autoComplete="current-password"
+            placeholder="Passord"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full bg-transparent text-sm text-white outline-none placeholder:text-neutral-500"
+          />
+        </AuthField>
+
+        {error && <AuthError message={error} />}
+
+        <button
+          type="submit"
+          disabled={busy}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary-500 to-primary-700 py-3 text-sm font-bold text-white shadow-glow-primary transition-all duration-200 hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-60"
+        >
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+          Logg inn
+        </button>
+        <button
+          type="button"
+          onClick={() => switchMode('forgot')}
+          className="w-full pt-1 text-center text-sm text-neutral-400 transition hover:text-white"
+        >
+          Glemt passord?
+        </button>
+      </form>
+    </AuthShell>
   );
 }

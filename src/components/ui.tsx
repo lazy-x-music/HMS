@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect } from 'react';
+import { type ReactNode, useEffect, useRef } from 'react';
 import { X, Loader2 } from 'lucide-react';
 
 /* ---------- Card ---------- */
@@ -105,6 +105,8 @@ export function Modal({
   children: ReactNode;
   maxWidth?: string;
 }) {
+  const pointerDownOnBackdrop = useRef(false);
+
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
@@ -119,7 +121,8 @@ export function Modal({
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-neutral-950/60 p-4 backdrop-blur-sm sm:items-center"
-      onClick={onClose}
+      onMouseDown={(e) => { pointerDownOnBackdrop.current = e.target === e.currentTarget; }}
+      onClick={(e) => { if (e.target === e.currentTarget && pointerDownOnBackdrop.current) onClose(); }}
     >
       <div
         className={`animate-scale-in max-h-[90vh] w-full overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl ${maxWidth}`}

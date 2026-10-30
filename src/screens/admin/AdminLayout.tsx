@@ -225,7 +225,7 @@ function AdminDashboard({
         <div className="relative flex items-start justify-between gap-4">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary-300">Ledelsesoversikt</p>
-            <h2 className="mt-1 font-display text-2xl font-bold tracking-tight sm:text-3xl">Sikkerhetsettersynelse</h2>
+            <h2 className="mt-1 font-display text-2xl font-bold tracking-tight sm:text-3xl">HMS-oversikt</h2>
             <p className="mt-2 max-w-xl text-sm leading-6 text-neutral-400">
               Følg etterlevelse, godkjente opplæringer, åpne avvik og stengerutiner i sanntid.
             </p>

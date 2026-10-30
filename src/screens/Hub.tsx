@@ -181,19 +181,19 @@ export default function Hub({ onNavigate, onOpenModule, onOpenAdmin, issuesCount
               </div>
               <p className="mt-1.5 font-display text-2xl font-bold tracking-tight text-balance sm:text-3xl">Hva skal du gjøre i dag?</p>
             </div>
-            <div className="flex gap-3">
+            <div className="grid grid-cols-2 gap-3 sm:flex">
               <button
                 onClick={() => onNavigate('issues')}
-                className="group flex min-w-[130px] items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left transition hover:border-warning-400/30 hover:bg-warning-500/5"
+                className="group flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3.5 py-3 text-left transition hover:border-warning-400/30 hover:bg-warning-500/5 sm:min-w-[130px] sm:px-4"
               >
-                <CircleAlert className="h-5 w-5 text-warning-300 transition group-hover:scale-110" />
+                <CircleAlert className="h-5 w-5 shrink-0 text-warning-300 transition group-hover:scale-110" />
                 <span>
                   <strong className="block text-lg leading-none">{issuesCount}</strong>
                   <small className="text-[11px] text-neutral-400">Åpne avvik</small>
                 </span>
               </button>
-              <div className="flex min-w-[130px] items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                <CheckCircle2 className="h-5 w-5 text-success-300" />
+              <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3.5 py-3 sm:min-w-[130px] sm:px-4">
+                <CheckCircle2 className="h-5 w-5 shrink-0 text-success-300" />
                 <span>
                   <strong className="block text-lg leading-none">{completedToday}</strong>
                   <small className="text-[11px] text-neutral-400">Fullført i dag</small>

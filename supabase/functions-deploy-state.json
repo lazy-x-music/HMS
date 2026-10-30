@@ -4,6 +4,10 @@
     "create-user": {
       "hasChanged": false,
       "hash": "254d94f7aa208d857081fcbffc5762bcee4f4089f6fa318ce11ada5035481a67"
+    },
+    "delete-user": {
+      "hasChanged": false,
+      "hash": "2ec228aecc6b0688a45c3ebf9ee9c6916a38d97c4670a1f624499afcd97648fa"
     }
   }
 }

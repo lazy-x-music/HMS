@@ -4,6 +4,7 @@ import { Loader2, ShieldCheck } from 'lucide-react';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { supabase, type Inspection } from '@/lib/supabase';
 import AuthScreen from '@/screens/AuthScreen';
+import ResetPasswordScreen from '@/screens/ResetPasswordScreen';
 import Hub, { type ModuleId } from '@/screens/Hub';
 import TruckCheck from '@/screens/TruckCheck';
 import TruckCheckDetail from '@/screens/TruckCheckDetail';
@@ -47,7 +48,7 @@ type View =
   | { name: 'admin'; initialTab?: AdminTab };
 
 function AppInner() {
-  const { session, profile, loading } = useAuth();
+  const { session, profile, loading, passwordRecovery } = useAuth();
   const [view, setView] = useState<View>({ name: 'hub' });
   const [inspections, setInspections] = useState<Inspection[]>([]);
   const [issuesCount, setIssuesCount] = useState(0);
@@ -73,6 +74,7 @@ function AppInner() {
   useEffect(() => { if (session) loadData(); }, [session, loadData]);
 
   if (loading) return <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-neutral-900"><div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-primary-500 to-primary-700"><ShieldCheck className="h-9 w-9 text-white" /></div><Loader2 className="h-6 w-6 animate-spin text-neutral-500" /></div>;
+  if (passwordRecovery) return <ResetPasswordScreen />;
   if (!session || !profile) return <AuthScreen />;
 
   const fallback = <div className="flex min-h-screen items-center justify-center bg-neutral-50"><Loader2 className="h-6 w-6 animate-spin text-neutral-400" /></div>;

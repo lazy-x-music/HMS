@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   Users, ShieldCheck, Wrench, Loader2, Mail, AlertCircle,
-  GraduationCap, ChevronDown, ChevronUp, UserPlus, X, Check,
+  GraduationCap, ChevronDown, ChevronUp, UserPlus, X, Check, Trash2,
 } from 'lucide-react';
 import { supabase, formatDate, type Profile, type Role, type TruckTraining } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
@@ -28,6 +28,9 @@ export default function UserManagement() {
   const [newUser, setNewUser] = useState<NewUser>({ email: '', password: '', fullName: '', role: 'inspector' });
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<Profile | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   async function load() {
     setLoading(true);
@@ -105,6 +108,40 @@ export default function UserManagement() {
     }
   }
 
+  async function deleteUser() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) {
+        setDeleteError('Ingen gyldig sesjon.');
+        return;
+      }
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-user`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          Apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ userId: deleteTarget.id }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        setDeleteError(result.error || 'Kunne ikke slette bruker');
+        return;
+      }
+      setDeleteTarget(null);
+      await load();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Ukjent feil');
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   const admins = users.filter((u) => u.role === 'admin');
   const inspectors = users.filter((u) => u.role === 'inspector');
 
@@ -141,7 +178,7 @@ export default function UserManagement() {
       </Button>
 
       {/* Add user modal */}
-      <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Legg til ny bruker" maxWidth="max-w-md">
+      <Modal open={showAdd} onClose={() => { if (!creating) setShowAdd(false); }} title="Legg til ny bruker" maxWidth="max-w-md">
         <div className="space-y-4">
           {createError && (
             <div className="flex items-start gap-2 rounded-xl bg-error-50 p-3 text-sm text-error-700">
@@ -207,6 +244,31 @@ export default function UserManagement() {
             {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
             Opprett bruker
           </Button>
+        </div>
+      </Modal>
+
+      {/* Delete user modal */}
+      <Modal open={!!deleteTarget} onClose={() => { if (!deleting) setDeleteTarget(null); }} title="Slett bruker" maxWidth="max-w-md">
+        <div className="space-y-4">
+          {deleteError && (
+            <div className="flex items-start gap-2 rounded-xl bg-error-50 p-3 text-sm text-error-700">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{deleteError}</span>
+            </div>
+          )}
+          <p className="text-sm leading-6 text-neutral-600">
+            Er du sikker på at du vil slette <strong className="text-neutral-900">{deleteTarget?.full_name || deleteTarget?.email}</strong>?
+            Brukeren mister tilgang med en gang. Tidligere kontroller og rapporter beholdes.
+          </p>
+          <div className="flex gap-2">
+            <Button variant="outline" className="flex-1" disabled={deleting} onClick={() => setDeleteTarget(null)}>
+              Avbryt
+            </Button>
+            <Button variant="danger" className="flex-1" disabled={deleting} onClick={deleteUser}>
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              Slett bruker
+            </Button>
+          </div>
         </div>
       </Modal>
 
@@ -307,6 +369,14 @@ export default function UserManagement() {
                     {busyId === u.id ? '...' : 'Admin'}
                   </button>
                 </div>
+                {u.id !== me?.id && (
+                  <button
+                    onClick={() => { setDeleteError(''); setDeleteTarget(u); }}
+                    className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold text-error-600 transition-colors hover:bg-error-50"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" /> Slett bruker
+                  </button>
+                )}
               </div>
             );
           })}
